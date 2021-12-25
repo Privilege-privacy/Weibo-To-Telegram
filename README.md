@@ -12,7 +12,7 @@
 
     拉取并部署完容器后，进入 `/` 目录，根据 `linux x86` 的方法修改 `conf.json` 后， `./main` 运行 
 
-        docker pull privileges/weibo:latest
+        docker pull privileges/weibo:1.1
      
      
      ### Windows 或其他平台架构，自行 `clone` 代码后交叉编译
