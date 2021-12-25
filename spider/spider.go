@@ -61,7 +61,7 @@ func Run(uid int) {
 				tg.SendMessageReply(reg(weibtext), item.Mblog.User.Screen_name, item.Scheme)
 				println(reg(weibtext))
 				for _, url := range weiboPhoto {
-					tg.SendPhoto(url.Url)
+					tg.SendPhoto(url.Large.Url)
 				}
 				db.Insert(reg(weibtext), item.Scheme)
 			}
