@@ -34,45 +34,40 @@ type Weibo struct {
 }
 
 func Run(uid int) {
-
 	url := fmt.Sprintf("https://m.weibo.cn/api/container/getIndex?containerid=107603%d", uid)
 	resp, err := http.Get(url)
 	if err != nil {
 		fmt.Println(err)
 	}
-
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		println(err)
 	}
-
 	var res Weibo
-
 	err = json.Unmarshal(body, &res)
-
 	//uid 不存在则返回 0
 	if res.Ok == 1 {
 		for _, item := range res.Data.Cards {
 			//检测这条微博是否在数据库中已保存
 			if db.Check(item.Scheme) <= 0 {
-				weibtext := item.Mblog.Text
+				weibocontent := item.Mblog.Text
 				weiboPhoto := item.Mblog.Pics
-				tg.SendMessageReply(reg(weibtext), item.Mblog.User.Screen_name, item.Scheme)
-				println(reg(weibtext))
+				tg.SendMessageReply(regx(weibocontent), item.Mblog.User.Screen_name, item.Scheme)
+				println(regx(weibocontent))
 				for _, url := range weiboPhoto {
 					tg.SendPhoto(url.Large.Url)
 				}
-				db.Insert(reg(weibtext), item.Scheme)
+				db.Insert(regx(weibocontent), item.Scheme)
 			}
 		}
 	} else {
 		fmt.Printf("uid 错误或炸号 %d \n", uid)
 	}
-	fmt.Printf("%d Done\n", uid)
+	fmt.Printf("User %d Done\n", uid)
 }
 
-func reg(src string) string {
+func regx(src string) string {
 	re, _ := regexp.Compile("<[^>]*>")
 	src = re.ReplaceAllString(src, "")
 	return src
