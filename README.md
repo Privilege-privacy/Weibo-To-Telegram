@@ -3,16 +3,5 @@
 
 ## 使用 
 
-- Linux x86
-     
-     从 [Releases](https://github.com/Privilege-privacy/Weibo-To-Telegram/releases/download/main/weibo.zip) 下载 zip 后解压，修改 `conf.json` 文件， 将 `Tgbotapi` 的 Value 值改为从 [Botfather](https://t.me/botfather) 中获取的 API Token ， `Chat_id` 的 value 值 ，可填 Telegram 群组 ID 或 个人账户 ID(可从@getmyid_bot 这个机器人获得)，`Weibo_uid` 的 Value 就是跟在 weibo.com/2201313382 的那一串数字，每个 uid 之间用 `,` 隔开，最后运行 `main` 二进制文件。
-
-- Docker
-    
-
-    拉取并部署完容器后，进入 `/` 目录，根据 `linux x86` 的方法修改 `conf.json` 后， `./main` 运行 
-
-        docker pull privileges/weibo:1.1
-     
-     
-     ### Windows 或其他平台架构，自行 `clone` 代码后交叉编译
+从 [Releases](https://github.com/Privilege-privacy/Weibo-To-Telegram/releases/tag/main) 下载对应平台的压缩包，解压并运行二进制文件后，会在当前目录生成`config.toml` `weibo.db`文件，
+修改 `config.toml` 配置文件，`tgbotapi` 的 `Value`值填写在 [Botfather](https://t.me/botfather) 获取到的 `API TOKEN`, `tgchatid` 的 `Value` 值可以填写在 [getmyid_bot](https://t.me/getmyid_bot) 获取到的`User_id ` , 或者把 [getmyid_bot](https://t.me/getmyid_bot) 和你创建的 `tgbot` 拉进同一个群组后随便发一条信息，就会获得当前的`Chat_id` , 如果填写的是 `User_id` 运行时 `Bot` 就会以私聊的方式发送信息，填写 `Chat_id` 运行时 `Bot` 就会转发信息到群组，`weibo_uid` 的 `Value` 值就是微博个人主页后面的那一串数字 `weibo.com/2201313382` 多个用户用 `,` 隔开，修改完成后，运行二进制文件就会开始转发。

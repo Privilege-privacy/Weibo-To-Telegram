@@ -4,12 +4,25 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func init() {
+	_, file := os.Stat("./weibo.db")
+	if os.IsNotExist(file) {
+		db, err := sql.Open("sqlite3", "./weibo.db")
+		if err != nil {
+			log.Println("创建数据库失败", err)
+		}
+		db.Exec("CREATE TABLE IF NOT EXISTS \"weibo\" (\"id\" INTEGER PRIMARY KEY, \"summary\" TEXT, \"link\" TEXT);")
+		defer db.Close()
+	}
+}
+
 func Check(url string) int {
-	db, err := sql.Open("sqlite3", "db/weibo.db")
+	db, err := sql.Open("sqlite3", "./weibo.db")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,7 +36,7 @@ func Check(url string) int {
 }
 
 func Insert(title, link string) int {
-	db, err := sql.Open("sqlite3", "db/weibo.db")
+	db, err := sql.Open("sqlite3", "./weibo.db")
 	if err != nil {
 		log.Fatal(err)
 	}
