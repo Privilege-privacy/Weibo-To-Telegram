@@ -1,8 +1,7 @@
-package db
+package internal
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 
@@ -24,12 +23,12 @@ func init() {
 func Check(url string) int {
 	db, err := sql.Open("sqlite3", "./weibo.db")
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	var counts int
 	err = db.QueryRow("SELECT COUNT(id) AS counts FROM weibo WHERE link = ?", url).Scan(&counts)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	defer db.Close()
 	return counts
@@ -38,11 +37,11 @@ func Check(url string) int {
 func Insert(title, link string) int {
 	db, err := sql.Open("sqlite3", "./weibo.db")
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	results, err := db.Exec("INSERT INTO weibo(summary, link) VALUES(?, ?)", title, link)
 	if err != nil {
-		fmt.Printf("insert failed: %s", err)
+		log.Printf("insert failed: %s\n", err)
 	}
 	result, _ := results.RowsAffected()
 	defer db.Close()
