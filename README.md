@@ -31,6 +31,11 @@
 
 > 例如 **weibo.com/u/2201313382** 这个微博个人主页，那么这个 `weibo_uid` 配置项的值就是 **2201313382**，多个用户之间用`,`分隔。</br> 示例： "Weibo_uid":[2201313382,123456,654321]
 
+### 运行
+`./main` 
+
+`./main -s=false` **运行时关闭消息打印**
+
 ### 感谢
 #### Idea： [Weibo](https://github.com/cndiandian/weibo)
 
