@@ -24,7 +24,7 @@
 
 #### TGUserIdORChatId
 > 将你创建的 `Bot` 和 [GetMyId_bot](https://t.me/getmyid_bot) 拉进同一个群组内，随便发送一条信息 `GetMyId_bot` 就会输出当前的`Chat ID`和你的`UserID`
->> 填写 `Chat ID ` Bot 就会转发消息到当前群组</br> 填写 `User ID` 就会以私聊的方式转发。
+>> 填写 `Chat ID` Bot 就会转发消息到当前群组</br> 填写 `User ID` 就会以私聊的方式转发。
 
 #### Weibo_uid
 > `weibo_uid` 的配置项为微博用户 ID，可以在 [微博用户主页](https://weibo.com/u/<your_weibo_uid>) 中查看。</br>
