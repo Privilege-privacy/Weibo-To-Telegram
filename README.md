@@ -2,10 +2,10 @@
 将微博动态实时同步到 Telegram 支持关注多个用户
 
 ## 使用
-1. 从 [releases](https://github.com/Privilege-privacy/Weibo-To-Telegram/releases) 页面下载对应平台的压缩包并解压缩。
+1. 从 [releases](https://github.com/Privilege-privacy/Weibo-To-Telegram/releases) 页面下载对应平台的二进制文件。
    
 
-2. 运行 `./main` 会在当前目录生成 `config.toml` 文件和 `weibo.db` 文件。
+2. 运行 `./Weibo-To-Telegram` 会在当前目录生成 `config.toml` 文件和 `weibo.db` 文件。
    
 
 3. 修改 `config.toml` 配置文件。
@@ -32,9 +32,9 @@
 > 例如 **weibo.com/u/2201313382** 这个微博个人主页，那么这个 `weibo_uid` 配置项的值就是 **2201313382**，多个用户之间用`,`分隔。</br> 示例： "Weibo_uid":[2201313382,123456,654321]
 
 ### 运行
-`./main` 
+`./Weibo-To-Telegram` 
 
-`./main -s=false` **运行时关闭消息打印**
+`./Weibo-To-Telegram -s=false` **运行时关闭消息打印**
 
 ### 感谢
 #### Idea： [Weibo](https://github.com/cndiandian/weibo)
