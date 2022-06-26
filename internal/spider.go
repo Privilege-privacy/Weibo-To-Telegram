@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"time"
 )
 
 func Run(uid int, silent bool) {
@@ -26,6 +27,7 @@ func Run(uid int, silent bool) {
 				pics := value.Get("mblog.pics").Array()
 				for _, pic := range pics {
 					sendPhoto(pic.Get("large.url").String())
+					time.Sleep(2 * time.Second)
 				}
 				Insert(regx(content), scheme)
 			}

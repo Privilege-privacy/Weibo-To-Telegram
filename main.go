@@ -48,10 +48,11 @@ func main() {
 	for {
 		for _, uid := range viper.GetIntSlice("weibo_uid") {
 			internal.Run(uid, Silents)
+			time.Sleep(3 * time.Second)
 		}
 		if Silents {
-			fmt.Printf("防止 IP 被拉黑 一分钟后下一轮\n")
+			fmt.Printf("防止 IP 被拉黑 五分钟后下一轮\n")
 		}
-		time.Sleep(time.Minute)
+		time.Sleep(time.Minute * 5)
 	}
 }
