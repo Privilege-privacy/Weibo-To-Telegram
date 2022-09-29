@@ -5,13 +5,13 @@ import (
 	"log"
 	"os"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func init() {
 	_, file := os.Stat("./weibo.db")
 	if os.IsNotExist(file) {
-		db, err := sql.Open("sqlite3", "./weibo.db")
+		db, err := sql.Open("sqlite", "./weibo.db")
 		if err != nil {
 			log.Println("创建数据库失败", err)
 		}
@@ -21,7 +21,7 @@ func init() {
 }
 
 func Check(url string) int {
-	db, err := sql.Open("sqlite3", "./weibo.db")
+	db, err := sql.Open("sqlite", "./weibo.db")
 	if err != nil {
 		log.Println(err)
 	}
@@ -35,7 +35,7 @@ func Check(url string) int {
 }
 
 func Insert(title, link string) int {
-	db, err := sql.Open("sqlite3", "./weibo.db")
+	db, err := sql.Open("sqlite", "./weibo.db")
 	if err != nil {
 		log.Println(err)
 	}
