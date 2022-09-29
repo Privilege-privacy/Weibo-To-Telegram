@@ -20,8 +20,6 @@
 | SavePicLocal  | 是否将图片保存到本地                      | false                                    |
 | SendLivePics  | 是否发送 Live 图片                    | false                                    |
 
-***
-
 ### 配置项
 
 #### TGBotApiToken
@@ -41,12 +39,8 @@
 > Android 客户端查看媒体组消息貌似会有排版问题，Live 图片会被单独显示，在 Windows 客户端下正常显示。 </br>
 > Live 图片会先保存到本地后再发送.
 
-***
-
 ### 运行
 ```./Weibo-To-Telegram``` 
-
-***
 
 ### 感谢
 #### Idea： [Weibo](https://github.com/cndiandian/weibo)
