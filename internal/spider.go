@@ -1,8 +1,8 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
-	"github.com/spf13/viper"
 	"github.com/tidwall/gjson"
 	"io"
 	"log"
@@ -14,46 +14,62 @@ import (
 	"strings"
 )
 
+var (
+	SendLivePics  bool
+	SavePicLocal  bool
+	MergeMessage  bool
+	wrongfileType = errors.New(`Bad Request: failed to send message #3 with the error message "Wrong type of the web page content"`)
+)
+
 func Run(uid int) {
 	body := doGet(uid)
-	//uid 不存在则返回 0
-	if gjson.Get(body, "ok").Int() == 1 {
-		gjson.Get(body, "data.cards").ForEach(func(key, value gjson.Result) bool {
-			name := value.Get("mblog.user.screen_name").String()
-			scheme := value.Get("scheme").String()
-			content := regx(value.Get("mblog.text").String())
-			pics := GetListPics(value.Get("mblog.pics").Array())
 
-			if strings.Contains(regx(content), "全文") {
-				content = GetFullContent(value.Get("mblog.bid").String())
-			}
+	if gjson.Get(body, "ok").Int() != 1 {
+		return
+	}
 
-			if Check(scheme) <= 0 {
-				log.Println(name, content, scheme)
-				if viper.GetBool("SendLivePics") && value.Get("mblog.pics.#.videoSrc").Exists() {
-					pics = GetLivePics(value.Get("mblog.pics").Array())
-					SendVideoGroupMessage(name, content, scheme, pics...)
-					if viper.GetBool("SavePicLocal") {
-						SaveAllPics(pics)
-					}
-					Insert(content, scheme)
-					return true
-				}
+	gjson.Get(body, "data.cards").ForEach(func(key, value gjson.Result) bool {
+		name := value.Get("mblog.user.screen_name").String()
+		scheme := value.Get("scheme").String()
+		content := regx(value.Get("mblog.text").String())
+		pics := GetListPics(value.Get("mblog.pics").Array())
 
-				if viper.GetBool("MergeMessage") {
-					SendMediaGroupMessage(name, content, scheme, pics...)
-				} else {
-					SendSeparatelyMessage(name, content, scheme, pics...)
-				}
+		if Check(scheme) != 0 {
+			return true
+		}
 
-				Insert(content, scheme)
-				if viper.GetBool("SavePicLocal") {
-					SaveAllPics(pics)
-				}
+		if strings.Contains(regx(content), "全文") {
+			content = GetFullContent(value.Get("mblog.bid").String())
+		}
+
+		if value.Get("mblog.pic_num").Int() > 9 {
+			pics = GetFullPics(value.Get("mblog.bid").String())
+		}
+
+		log.Println(name, content, scheme)
+
+		if SendLivePics && value.Get("mblog.pics.#.videoSrc").Exists() {
+			pics = GetLivePics(value.Get("mblog.pics").Array())
+			SendVideoGroupMessage(name, content, scheme, pics...)
+			if SavePicLocal {
+				SaveAllPics(pics)
 			}
 			return true
-		})
-	}
+		}
+
+		if MergeMessage {
+			SendMediaGroupMessage(name, content, scheme, pics...)
+		} else {
+			SendSeparatelyMessage(name, content, scheme, pics...)
+		}
+
+		if SavePicLocal {
+			SaveAllPics(pics)
+		}
+
+		return true
+	})
+
 }
 
 func regx(src string) string {
@@ -84,6 +100,20 @@ func GetFullContent(bid string) string {
 		return regx(gjson.Get(string(body), "data.text").String())
 	}
 	return ""
+}
+
+func GetFullPics(bid string) []string {
+	var url strings.Builder
+	url.WriteString("https://m.weibo.cn/statuses/show?id=")
+	url.WriteString(bid)
+
+	resp, err := http.Get(url.String())
+	if err == nil {
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return GetListPics(gjson.Get(string(body), "data.pics").Array())
+	}
+	return nil
 }
 
 func GetListPics(list []gjson.Result) (temp []string) {
