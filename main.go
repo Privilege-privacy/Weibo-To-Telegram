@@ -2,10 +2,16 @@ package main
 
 import (
 	"Weibo-To-Telegram/internal"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/spf13/viper"
 	"log"
 	"os"
 	"time"
+)
+
+var (
+	Interval time.Duration
+	WeiboUid []int
 )
 
 func init() {
@@ -33,20 +39,30 @@ func init() {
 		}
 		log.Fatal("根据要求填写 Config.toml 后运行")
 	}
-}
 
-func main() {
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatal("加载配置文件错误", err)
 	}
 
-	interval := viper.GetDuration("Interval")
+	Interval = viper.GetDuration("Interval")
+	WeiboUid = viper.GetIntSlice("weibo_uid")
 
+	internal.SendLivePics = viper.GetBool("SendLivePics")
+	internal.SavePicLocal = viper.GetBool("SavePicLocal")
+	internal.MergeMessage = viper.GetBool("MergeMessage")
+
+	internal.TgBotApiToken = viper.GetString("TgBotApiToken")
+	internal.TgChatid = viper.GetInt64("TgChatid")
+
+	internal.Bot, _ = tgbotapi.NewBotAPI(internal.TgBotApiToken)
+}
+
+func main() {
 	for {
-		for _, uid := range viper.GetIntSlice("weibo_uid") {
+		for _, uid := range WeiboUid {
 			internal.Run(uid)
 			time.Sleep(3 * time.Second)
 		}
-		time.Sleep(time.Second * interval)
+		time.Sleep(time.Second * Interval)
 	}
 }
