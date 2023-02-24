@@ -16,6 +16,10 @@ builds:
     goarch:
       - amd64
       - arm64
+    flags:
+      - '-a'
+    ldflags:
+      - '-extldflags "-static"'
 archives:
   - replacements:
       darwin: Darwin
