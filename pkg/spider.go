@@ -1,7 +1,6 @@
-package internal
+package pkg
 
 import (
-	"errors"
 	"fmt"
 	"github.com/tidwall/gjson"
 	"io"
@@ -15,10 +14,9 @@ import (
 )
 
 var (
-	SendLivePics  bool
-	SavePicLocal  bool
-	MergeMessage  bool
-	wrongfileType = errors.New(`Bad Request: failed to send message #3 with the error message "Wrong type of the web page content"`)
+	SendLivePics bool
+	SavePicLocal bool
+	MergeMessage bool
 )
 
 func Run(uid int) {
@@ -30,15 +28,15 @@ func Run(uid int) {
 
 	gjson.Get(body, "data.cards").ForEach(func(key, value gjson.Result) bool {
 		name := value.Get("mblog.user.screen_name").String()
-		scheme := value.Get("scheme").String()
+		url := value.Get("scheme").String()
 		content := regx(value.Get("mblog.text").String())
 		pics := GetListPics(value.Get("mblog.pics").Array())
 
-		if Check(scheme) != 0 {
+		if Check(url) != 0 {
 			return true
 		}
 
-		if strings.Contains(regx(content), "全文") {
+		if strings.Contains(content, "全文") {
 			content = GetFullContent(value.Get("mblog.bid").String())
 		}
 
@@ -46,26 +44,15 @@ func Run(uid int) {
 			pics = GetFullPics(value.Get("mblog.bid").String())
 		}
 
-		log.Println(name, content, scheme)
+		log.Println(name, content, url)
 
 		if SendLivePics && value.Get("mblog.pics.#.videoSrc").Exists() {
 			pics = GetLivePics(value.Get("mblog.pics").Array())
-			SendVideoGroupMessage(name, content, scheme, pics...)
-			if SavePicLocal {
-				SaveAllPics(pics)
-			}
+			SendMessage(name, url, content, pics)
 			return true
 		}
 
-		if MergeMessage {
-			SendMediaGroupMessage(name, content, scheme, pics...)
-		} else {
-			SendSeparatelyMessage(name, content, scheme, pics...)
-		}
-
-		if SavePicLocal {
-			SaveAllPics(pics)
-		}
+		SendMessage(name, url, content, pics)
 
 		return true
 	})
@@ -73,8 +60,8 @@ func Run(uid int) {
 }
 
 func regx(src string) string {
-	r, _ := regexp.Compile("<[^>]*>")
-	return r.ReplaceAllString(src, "")
+	re := regexp.MustCompile("<[^>]*>")
+	return strings.TrimSpace(re.ReplaceAllString(src, ""))
 }
 
 func doGet(uid int) string {
@@ -116,11 +103,12 @@ func GetFullPics(bid string) []string {
 	return nil
 }
 
-func GetListPics(list []gjson.Result) (temp []string) {
+func GetListPics(list []gjson.Result) []string {
+	var temp = make([]string, 0, len(list))
 	for _, result := range list {
 		temp = append(temp, result.Get("large.url").String())
 	}
-	return
+	return temp
 }
 
 func GetLivePics(list []gjson.Result) (temp []string) {
@@ -134,7 +122,7 @@ func GetLivePics(list []gjson.Result) (temp []string) {
 	return
 }
 
-func SavePics(scheme string) string {
+func SavePics(schema string) string {
 	_, err := os.Stat("download/")
 	if os.IsNotExist(err) {
 		err := os.Mkdir("download/", os.ModePerm)
@@ -143,13 +131,13 @@ func SavePics(scheme string) string {
 		}
 	}
 
-	scheme, _ = url.QueryUnescape(scheme)
+	schema, _ = url.QueryUnescape(schema)
 
 	var filename strings.Builder
 	filename.WriteString("download/")
-	filename.WriteString(path.Base(scheme))
+	filename.WriteString(path.Base(schema))
 
-	resp, err := http.Get(scheme)
+	resp, err := http.Get(schema)
 	if err != nil {
 		log.Println("图片", filename.String(), "下载失败")
 		return ""

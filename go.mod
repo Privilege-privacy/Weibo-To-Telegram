@@ -1,4 +1,4 @@
-module Weibo-To-Telegram
+module github.com/Privilege-privacy/Weibo-To-Telegram
 
 go 1.18
 

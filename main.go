@@ -1,7 +1,7 @@
 package main
 
 import (
-	"Weibo-To-Telegram/internal"
+	"github.com/Privilege-privacy/Weibo-To-Telegram/pkg"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/spf13/viper"
 	"log"
@@ -9,30 +9,29 @@ import (
 	"time"
 )
 
-var (
-	Interval time.Duration
-	WeiboUid []int
-)
+type Config struct {
+	TgBotApiToken string
+	TgChatid      int64
+	WeiboUid      []int
+	MergeMessage  bool
+	Interval      int
+	SavePicLocal  bool
+	SendLivePics  bool
+}
 
-func init() {
-	_, file := os.Stat("config.toml")
-	if file == nil {
-		viper.AddConfigPath(".")
-	}
-
-	if os.IsNotExist(file) {
-		log.Println("未在当前目录找到配置文件 将在当前目录创建 Config.toml")
+func main() {
+	var config Config
+	viper.AddConfigPath(".")
+	if _, file := os.Stat("config.toml"); os.IsNotExist(file) {
 		viper.SetConfigName("config")
 		viper.SetConfigType("toml")
-		viper.AddConfigPath(".")
-
-		viper.Set("TgBotApiToken", "")
-		viper.Set("TgChatid", 0)
-		viper.Set("Weibo_uid", []int{})
-		viper.Set("MergeMessage", true)
-		viper.Set("Interval", 120)
-		viper.Set("SavePicLocal", false)
-		viper.Set("SendLivePics", true)
+		viper.SetDefault("TgBotApiToken", "")
+		viper.SetDefault("TgChatid", 0)
+		viper.SetDefault("WeiboUid", []int{})
+		viper.SetDefault("MergeMessage", true)
+		viper.SetDefault("Interval", 120)
+		viper.SetDefault("SavePicLocal", false)
+		viper.SetDefault("SendLivePics", true)
 
 		if err := viper.SafeWriteConfig(); err != nil {
 			log.Fatal("保存配置文件失败", err)
@@ -44,25 +43,27 @@ func init() {
 		log.Fatal("加载配置文件错误", err)
 	}
 
-	Interval = viper.GetDuration("Interval")
-	WeiboUid = viper.GetIntSlice("weibo_uid")
+	if err := viper.Unmarshal(&config); err != nil {
+		log.Fatal("解析配置文件错误", err)
+	}
 
-	internal.SendLivePics = viper.GetBool("SendLivePics")
-	internal.SavePicLocal = viper.GetBool("SavePicLocal")
-	internal.MergeMessage = viper.GetBool("MergeMessage")
+	pkg.TgBotApiToken = config.TgBotApiToken
+	pkg.ChatId = config.TgChatid
+	pkg.SendLivePics = config.SendLivePics
+	pkg.SavePicLocal = config.SavePicLocal
+	pkg.MergeMessage = config.MergeMessage
 
-	internal.TgBotApiToken = viper.GetString("TgBotApiToken")
-	internal.TgChatid = viper.GetInt64("TgChatid")
+	bot, err := tgbotapi.NewBotAPI(pkg.TgBotApiToken)
+	if err != nil {
+		log.Fatal("连接 Telegram 失败", err)
+	}
+	pkg.Bot = bot
 
-	internal.Bot, _ = tgbotapi.NewBotAPI(internal.TgBotApiToken)
-}
-
-func main() {
 	for {
-		for _, uid := range WeiboUid {
-			internal.Run(uid)
+		for _, uid := range config.WeiboUid {
+			pkg.Run(uid)
 			time.Sleep(3 * time.Second)
 		}
-		time.Sleep(time.Second * Interval)
+		time.Sleep(time.Duration(config.Interval))
 	}
 }
