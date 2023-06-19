@@ -3,10 +3,10 @@
 
 ## 使用
 1. 从 [releases](https://github.com/Privilege-privacy/Weibo-To-Telegram/releases) 页面下载对应平台的二进制文件。
-   
+
 
 2. 运行 `./Weibo-To-Telegram` 会在当前目录生成 `config.toml` 文件和 `weibo.db` 文件。
-   
+
 
 3. 修改 `config.toml` 配置文件。
 
@@ -40,9 +40,23 @@
 > Live 图片会先保存到本地后再发送.
 
 ### 运行
-```./Weibo-To-Telegram``` 
+```./Weibo-To-Telegram```
+
+## Docker
+1. 修改配置文件并保存为 `config.toml`
+```
+interval = 120
+mergemessage = true
+savepiclocal = false
+sendlivepics = true
+tgbotapitoken = ''
+tgchatid = 0
+weibouid = []
+```
+2. 启动容器
+```
+docker run -itd --name weibo -v $PWD/config.toml:/app/config.toml ghcr.io/privilege-privacy/weibo-to-telegram:latest
+```
 
 ### 感谢
 #### Idea： [Weibo](https://github.com/cndiandian/weibo)
-
-

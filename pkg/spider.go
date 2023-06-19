@@ -1,35 +1,38 @@
 package pkg
 
 import (
-	"fmt"
-	"github.com/tidwall/gjson"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+
+	"github.com/go-resty/resty/v2"
+	"github.com/tidwall/gjson"
 )
 
 var (
 	SendLivePics bool
 	SavePicLocal bool
 	MergeMessage bool
+	client       = resty.New().SetBaseURL("https://m.weibo.cn").R()
 )
 
 func Run(uid int) {
-	body := doGet(uid)
+	resp, err := client.Get("/api/container/getIndex?containerid=107603" + strconv.Itoa(uid))
+	if err != nil {	return }
 
-	if gjson.Get(body, "ok").Int() != 1 {
-		return
-	}
+	if gjson.Get(resp.String(), "ok").Int() != 1 { return }
 
-	gjson.Get(body, "data.cards").ForEach(func(key, value gjson.Result) bool {
+	gjson.Get(resp.String(), "data.cards").ForEach(func(key, value gjson.Result) bool {
 		name := value.Get("mblog.user.screen_name").String()
 		url := value.Get("scheme").String()
-		content := regx(value.Get("mblog.text").String())
+		content := removeHTMLTags(value.Get("mblog.text").String())
 		pics := GetListPics(value.Get("mblog.pics").Array())
 
 		if Check(url) != 0 {
@@ -56,55 +59,31 @@ func Run(uid int) {
 
 		return true
 	})
-
 }
 
-func regx(src string) string {
-	re := regexp.MustCompile("<[^>]*>")
-	return strings.TrimSpace(re.ReplaceAllString(src, ""))
-}
-
-func doGet(uid int) string {
-	url := fmt.Sprintf("https://m.weibo.cn/api/container/getIndex?containerid=107603%d", uid)
-	resp, err := http.Get(url)
-	if err == nil {
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		return string(body)
-	}
-	return ""
+func removeHTMLTags(src string) string {
+	return strings.TrimSpace(regexp.MustCompile("<[^>]*>").ReplaceAllString(src, ""))
 }
 
 func GetFullContent(bid string) string {
-	var url strings.Builder
-	url.WriteString("https://m.weibo.cn/statuses/show?id=")
-	url.WriteString(bid)
-
-	resp, err := http.Get(url.String())
+	resp, err := client.Get("/statuses/show?id=" + bid)
 	if err == nil {
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		return regx(gjson.Get(string(body), "data.text").String())
+		return removeHTMLTags(gjson.Get(resp.String(), "data.text").String())
 	}
 	return ""
 }
 
-func GetFullPics(bid string) []string {
-	var url strings.Builder
-	url.WriteString("https://m.weibo.cn/statuses/show?id=")
-	url.WriteString(bid)
-
-	resp, err := http.Get(url.String())
-	if err == nil {
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		return GetListPics(gjson.Get(string(body), "data.pics").Array())
-	}
+func GetFullPics(bid string) (slice []string) {
+	resp, _ := client.Get("/statuses/show?id=" + bid)
+	gjson.Get(resp.String(), "data.pics").ForEach(func(key, value gjson.Result) bool {
+		slice = append(slice, value.Get("large.url").String())
+		return true
+	})
 	return nil
 }
 
 func GetListPics(list []gjson.Result) []string {
-	var temp = make([]string, 0, len(list))
+	temp := make([]string, 0, len(list))
 	for _, result := range list {
 		temp = append(temp, result.Get("large.url").String())
 	}
@@ -125,26 +104,22 @@ func GetLivePics(list []gjson.Result) (temp []string) {
 func SavePics(schema string) string {
 	_, err := os.Stat("download/")
 	if os.IsNotExist(err) {
-		err := os.Mkdir("download/", os.ModePerm)
-		if err != nil {
+		if err := os.Mkdir("download/", os.ModePerm); err != nil {
 			log.Fatal("创建 download 文件夹失败, 检查当前目录下的文件夹权限", err)
 		}
 	}
 
 	schema, _ = url.QueryUnescape(schema)
-
-	var filename strings.Builder
-	filename.WriteString("download/")
-	filename.WriteString(path.Base(schema))
+	filename := filepath.Join("download", path.Base(schema))
 
 	resp, err := http.Get(schema)
 	if err != nil {
-		log.Println("图片", filename.String(), "下载失败")
+		log.Println("图片", filename, "下载失败")
 		return ""
 	}
 	defer resp.Body.Close()
 
-	file, err := os.Create(filename.String())
+	file, err := os.Create(filename)
 	if err != nil {
 		log.Println("文件创建失败")
 		return ""
@@ -153,19 +128,15 @@ func SavePics(schema string) string {
 
 	_, err = io.Copy(file, resp.Body)
 	if err == nil {
-		return filename.String()
+		return filename
 	}
 	return ""
 }
 
 func SaveAllPics(pics []string) {
 	for _, pic := range pics {
-		var filename strings.Builder
-		filename.WriteString("download/")
-		filename.WriteString(path.Base(pic))
-
-		_, err := os.Stat(filename.String())
-		if os.IsNotExist(err) {
+		filename := filepath.Join("download", path.Base(pic))
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
 			SavePics(pic)
 		}
 	}

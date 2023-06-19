@@ -2,10 +2,11 @@ package pkg
 
 import (
 	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"path/filepath"
 	"strings"
 	"time"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 var (
@@ -15,12 +16,12 @@ var (
 )
 
 func SendSeparatelyMessage(url, message string, mediaFiles []string) error {
-	var messageInlineKeyboard = tgbotapi.NewInlineKeyboardMarkup(
+	messageInlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonURL("🔗点击查看原微博", url),
 		),
 	)
-	var msg = tgbotapi.NewMessage(ChatId, message)
+	msg := tgbotapi.NewMessage(ChatId, message)
 	msg.ReplyMarkup = messageInlineKeyboard
 	_, err := Bot.Send(msg)
 
@@ -66,10 +67,11 @@ func SendMergeMessage(message string, mediaFiles []string) error {
 		}
 	}
 
-	if mediaItem, ok := mediaGroup[0].(tgbotapi.InputMediaPhoto); ok {
+	switch mediaItem := mediaGroup[0].(type) {
+	case tgbotapi.InputMediaPhoto:
 		mediaItem.Caption = message
 		mediaGroup[0] = mediaItem
-	} else if mediaItem, ok := mediaGroup[0].(tgbotapi.InputMediaVideo); ok {
+	case tgbotapi.InputMediaVideo:
 		mediaItem.Caption = message
 		mediaGroup[0] = mediaItem
 	}
@@ -103,5 +105,4 @@ func SendMessage(name, url, content string, mediaFies []string) {
 	if SavePicLocal {
 		SaveAllPics(mediaFies)
 	}
-
 }
