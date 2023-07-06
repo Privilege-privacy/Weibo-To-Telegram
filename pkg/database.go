@@ -3,28 +3,32 @@ package pkg
 import (
 	"database/sql"
 	"log"
-	_ "modernc.org/sqlite"
 	"os"
+
+	_ "modernc.org/sqlite"
 )
 
-var db *sql.DB
+var (
+	db     *sql.DB
+	dbfile string = "weibo.db"
+)
 
 func init() {
-	_, err := os.Stat("./weibo.db")
+	_, err := os.Stat(dbfile)
 	if os.IsNotExist(err) {
 		if err := createDatabase(); err != nil {
 			log.Fatal("创建数据库失败：", err)
 		}
 	}
 
-	db, err = sql.Open("sqlite", "./weibo.db")
+	db, err = sql.Open("sqlite", dbfile)
 	if err != nil {
 		log.Fatal("连接数据库失败：", err)
 	}
 }
 
 func createDatabase() error {
-	conn, err := sql.Open("sqlite", "./weibo.db")
+	conn, err := sql.Open("sqlite", dbfile)
 	if err != nil {
 		return err
 	}

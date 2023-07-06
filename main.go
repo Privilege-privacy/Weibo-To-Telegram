@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/Privilege-privacy/Weibo-To-Telegram/pkg"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/spf13/viper"
 	"log"
 	"os"
 	"time"
+
+	"github.com/Privilege-privacy/Weibo-To-Telegram/pkg"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/spf13/viper"
 )
 
 type Config struct {

@@ -3,6 +3,7 @@ package pkg
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ func SendSeparatelyMessage(url, message string, mediaFiles []string) error {
 	)
 	msg := tgbotapi.NewMessage(ChatId, message)
 	msg.ReplyMarkup = messageInlineKeyboard
+	msg.ParseMode = tgbotapi.ModeHTML
 	_, err := Bot.Send(msg)
 
 	for _, file := range mediaFiles {
@@ -89,10 +91,10 @@ func SendMergeMessage(message string, mediaFiles []string) error {
 
 func SendMessage(name, url, content string, mediaFies []string) {
 	var err error
-	message := fmt.Sprintf("博主: [%s]\n%s\n", name, content)
+	message := fmt.Sprintf("「#%s」\n\n *%s*\n", name, content)
 
 	if len(mediaFies) == 0 || !MergeMessage {
-		err = SendSeparatelyMessage(url, message, mediaFies)
+		err = SendSeparatelyMessage(url, regexp.MustCompile(`\*(.*?)\*`).ReplaceAllString(message, "<b>$1</b>"), mediaFies)
 	} else {
 		message += fmt.Sprintf("\n[🔗点击查看原微博](%s)", url)
 		err = SendMergeMessage(message, mediaFies)
