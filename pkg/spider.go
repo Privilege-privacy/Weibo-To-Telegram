@@ -25,9 +25,9 @@ var (
 
 func Run(uid int) {
 	resp, err := client.Get("/api/container/getIndex?containerid=107603" + strconv.Itoa(uid))
-	if err != nil {	return }
-
-	if gjson.Get(resp.String(), "ok").Int() != 1 { return }
+	if err != nil || gjson.Get(resp.String(), "ok").Int() != 1 {
+		return
+	}
 
 	gjson.Get(resp.String(), "data.cards").ForEach(func(key, value gjson.Result) bool {
 		name := value.Get("mblog.user.screen_name").String()
@@ -37,6 +37,14 @@ func Run(uid int) {
 
 		if Check(url) != 0 {
 			return true
+		}
+
+		if value.Get("mblog.page_info.urls").Exists() {
+			url := value.Get("mblog.page_info.urls|@values|0").String()
+			resp, _ := client.Get(url)
+			if resp.Size() < 50*1024*1024 {
+				pics = append(pics, url)
+			}
 		}
 
 		if strings.Contains(content, "全文") {
@@ -114,7 +122,7 @@ func SavePics(schema string) string {
 
 	resp, err := http.Get(schema)
 	if err != nil {
-		log.Println("图片", filename, "下载失败")
+		log.Println("图片: ", filename, "下载失败")
 		return ""
 	}
 	defer resp.Body.Close()

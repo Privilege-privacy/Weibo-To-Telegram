@@ -10,6 +10,8 @@
 
 3. 修改 `config.toml` 配置文件。
 
+4. 运行 `./Weibo-To-Telegram`
+
 | 配置项           | 含义                              | 示例                                       |
 |---------------|---------------------------------|------------------------------------------|
 | TgBotApiToken | Telegram Bot Api Token          | 90804:pqwozgkoadsaa...                   |
@@ -39,9 +41,6 @@
 > Android 客户端查看媒体组消息貌似会有排版问题，Live 图片会被单独显示，在 Windows 客户端下正常显示。 </br>
 > Live 图片会先保存到本地后再发送.
 
-### 运行
-```./Weibo-To-Telegram```
-
 ## Docker
 1. 修改配置文件并保存为 `config.toml`
 ```
@@ -56,6 +55,28 @@ weibouid = []
 2. 启动容器
 ```
 docker run -itd --name weibo -v $PWD/config.toml:/app/config.toml ghcr.io/privilege-privacy/weibo-to-telegram:latest
+```
+### Docker Compose
+1. 保存为 `docker-compose.yml`
+```
+services:
+    weibo:
+        image: ghcr.io/privilege-privacy/weibo-to-telegram:latest
+        container_name: weibo
+        restart: unless-stopped
+        volumes:
+            - $PWD/weibo:/app/
+
+```
+2. 启动容器
+
+```
+docker compose up -d
+```
+3. 修改当前 `weibo` 目录下的 `config.toml` 配置文件后重启容器
+
+```
+docker restart weibo
 ```
 
 ### 感谢
