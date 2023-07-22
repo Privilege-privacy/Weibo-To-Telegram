@@ -4,3 +4,4 @@ dist/
 download/
 main
 .vscode/
+*.json

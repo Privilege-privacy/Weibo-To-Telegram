@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"os"
+	"sync"
 
 	_ "modernc.org/sqlite"
 )
@@ -11,6 +12,7 @@ import (
 var (
 	db     *sql.DB
 	dbfile string = "weibo.db"
+	mutex  sync.Mutex
 )
 
 func init() {
@@ -42,18 +44,25 @@ func createDatabase() error {
 	return nil
 }
 
-func Check(url string) (result int) {
-	if err := db.QueryRow("SELECT COUNT(id) AS counts FROM weibo WHERE link = ?", url).Scan(&result); err != nil {
+func ExistsInDB(url string) bool {
+	mutex.Lock()
+	defer mutex.Unlock()
+	var count int
+	if err := db.QueryRow("SELECT COUNT(id) AS counts FROM weibo WHERE link = ?", url).Scan(&count); err != nil {
 		log.Println(err)
+		return false
 	}
-	return result
+	return count > 0
 }
 
-func Insert(title, url string) int {
+func InsertDB(title, url string) bool {
+	mutex.Lock()
+	defer mutex.Unlock()
 	results, err := db.Exec("INSERT INTO weibo(summary, link) VALUES(?, ?)", title, url)
 	if err != nil {
 		log.Println("Insert Err: ", err)
+		return false
 	}
 	result, _ := results.RowsAffected()
-	return int(result)
+	return result > 0
 }

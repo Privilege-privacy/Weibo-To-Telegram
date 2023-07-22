@@ -60,11 +60,13 @@ func main() {
 	}
 	pkg.Bot = bot
 
+	go pkg.SendPosts()
+
 	for {
 		for _, uid := range config.WeiboUid {
 			pkg.Run(uid)
 			time.Sleep(3 * time.Second)
 		}
-		time.Sleep(time.Duration(config.Interval))
+		time.Sleep(time.Duration(config.Interval) * time.Second)
 	}
 }
