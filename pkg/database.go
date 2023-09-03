@@ -1,8 +1,10 @@
 package pkg
 
 import (
+	"context"
 	"database/sql"
 	"log"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -49,7 +51,7 @@ func ExistsInDB(url string) bool {
 	defer mutex.Unlock()
 	var count int
 	if err := db.QueryRow("SELECT COUNT(id) AS counts FROM weibo WHERE link = ?", url).Scan(&count); err != nil {
-		log.Println(err)
+		logger.LogAttrs(context.Background(), slog.LevelWarn, "ExistsInDB Failed", slog.String("URL", url))
 		return false
 	}
 	return count > 0
@@ -60,7 +62,7 @@ func InsertDB(title, url string) bool {
 	defer mutex.Unlock()
 	results, err := db.Exec("INSERT INTO weibo(summary, link) VALUES(?, ?)", title, url)
 	if err != nil {
-		log.Println("Insert Err: ", err)
+		logger.LogAttrs(context.Background(), slog.LevelWarn, "InsertDB Failed", slog.String("URL", url))
 		return false
 	}
 	result, _ := results.RowsAffected()

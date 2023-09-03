@@ -1,4 +1,4 @@
-FROM golang:1.19.5-alpine3.16 as builder
+FROM golang:1.21.0-alpine as builder
 WORKDIR /build
 COPY . .
 RUN go build -o Weibo-To-Telegram main.go

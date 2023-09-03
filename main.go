@@ -7,7 +7,6 @@ import (
 
 	"github.com/Privilege-privacy/Weibo-To-Telegram/pkg"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -20,33 +19,18 @@ type Config struct {
 	SendLivePics  bool
 }
 
-func main() {
-	var config Config
-	viper.AddConfigPath(".")
-	if _, file := os.Stat("config.toml"); os.IsNotExist(file) {
-		viper.SetConfigName("config")
-		viper.SetConfigType("toml")
-		viper.SetDefault("TgBotApiToken", "")
-		viper.SetDefault("TgChatid", 0)
-		viper.SetDefault("WeiboUid", []int{})
-		viper.SetDefault("MergeMessage", true)
-		viper.SetDefault("Interval", 120)
-		viper.SetDefault("SavePicLocal", false)
-		viper.SetDefault("SendLivePics", true)
-
-		if err := viper.SafeWriteConfig(); err != nil {
-			log.Fatal("保存配置文件失败", err)
+func init() {
+	if _, err := os.Stat("config.toml"); os.IsNotExist(err) {
+		if err := pkg.CreateConfig(); err != nil {
+			log.Fatalln("创建 Config.toml 失败:", err)
 		}
-		log.Fatal("根据要求填写 Config.toml 后运行")
+		log.Fatalln("根据要求填写 Config.toml 后运行")
 	}
+	
+}
 
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatal("加载配置文件错误", err)
-	}
-
-	if err := viper.Unmarshal(&config); err != nil {
-		log.Fatal("解析配置文件错误", err)
-	}
+func main() {
+	config := pkg.LoadConfig()
 
 	pkg.TgBotApiToken = config.TgBotApiToken
 	pkg.ChatId = config.TgChatid

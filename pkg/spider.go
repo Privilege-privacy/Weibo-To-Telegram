@@ -1,22 +1,15 @@
 package pkg
 
 import (
+	"context"
 	"fmt"
-	"image"
-	"image/jpeg"
-	"log"
-	"net/url"
-	"os"
-	"path"
-	"path/filepath"
-	"regexp"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/hashicorp/go-getter"
 	"github.com/tidwall/gjson"
 )
 
@@ -27,6 +20,7 @@ var (
 
 	client = resty.New().SetBaseURL("https://m.weibo.cn")
 	PostCh = make(chan PostQueue)
+	logger = slog.New(slog.Default().Handler())
 )
 
 type (
@@ -53,6 +47,15 @@ type (
 	}
 )
 
+func Run(uid int) {
+	resp, err := client.R().Get("/api/container/getIndex?containerid=107603" + strconv.Itoa(uid))
+	body := resp.String()
+	if err != nil || gjson.Get(body, "ok").Int() != 1 {
+		return
+	}
+	ParsePost(body)
+}
+
 func NewPost(Url, Raw, BlogID string) *Post {
 	return &Post{
 		Url:    Url,
@@ -62,21 +65,33 @@ func NewPost(Url, Raw, BlogID string) *Post {
 }
 
 func (p *Post) MessageBuilder(Author, Raw, Url string) {
+	mergeMessage := MergeMessage && len(p.MediaInfo) != 0
+
 	if p.Text != "" {
 		Raw = p.Text
 	}
 
-	Template := fmt.Sprintf("「 #%s 」\n\n %s\n", Author, Raw)
+	if mergeMessage {
+		Raw = strings.ReplaceAll(Raw, "<br />", "\n")
+	}
 
-	if MergeMessage && len(p.MediaInfo) != 0 {
+	if strings.Contains(Raw, "https://weibo.cn/sinaurl?u=") {
+		Raw = parseHTML(Raw)
+	}
+
+	Raw = removeHTMLTags(Raw)
+
+	Template := fmt.Sprintf("「 #%s 」\n\n %s\n", Author, Raw)
+	if mergeMessage {
 		Template = fmt.Sprintf("「 #%s 」\n\n *%s*\n", Author, Raw)
 		Template += fmt.Sprintf("\n[🔗点击查看原微博](%s)", Url)
 	}
 
+	p.Raw = Raw
 	p.Text = Template
 }
 
-func (p *Post) SeedChBuilder(saveImage bool) PostQueue {
+func (p *Post) SendChBuilder(saveImage bool) PostQueue {
 	mediaGroup := make([]interface{}, 0, len(p.MediaInfo))
 	for _, file := range p.MediaInfo {
 		url := file.imageUrl
@@ -157,7 +172,10 @@ func (p *Post) SendMessage() {
 			tgbotapi.NewInlineKeyboardButtonURL("🔗点击查看原微博", p.Url),
 		),
 	)
-	log.Println(p.Raw, p.Url)
+
+	logger.LogAttrs(context.Background(), slog.LevelInfo, "SendMsg",
+		slog.String("微博正文", p.Raw),
+		slog.String("微博链接", p.Url))
 
 	msg := tgbotapi.NewMessage(ChatId, p.Text)
 	msg.ReplyMarkup = messageInlineKeyboard
@@ -179,14 +197,6 @@ func (p *Post) SendMessage() {
 	}
 }
 
-func Run(uid int) {
-	resp, err := client.R().Get("/api/container/getIndex?containerid=107603" + strconv.Itoa(uid))
-	if err != nil || gjson.Get(resp.String(), "ok").Int() != 1 {
-		return
-	}
-	ParsePost(resp.String())
-}
-
 func ParsePost(jsonData string) {
 	gjson.Get(jsonData, "data.cards").ForEach(func(_, value gjson.Result) bool {
 		Url := value.Get("scheme").String()
@@ -195,7 +205,7 @@ func ParsePost(jsonData string) {
 		}
 
 		Author := value.Get("mblog.user.screen_name").String()
-		Raw := removeHTMLTags(value.Get("mblog.text").String())
+		Raw := value.Get("mblog.text").String()
 		ImgNum := value.Get("mblog.pic_num").Int()
 		BlogID := value.Get("mblog.id").String()
 
@@ -229,7 +239,7 @@ func ParsePost(jsonData string) {
 			return true
 		}
 
-		PostCh <- posts.SeedChBuilder(false)
+		PostCh <- posts.SendChBuilder(false)
 
 		return true
 	})
@@ -244,7 +254,9 @@ func SendPosts() {
 		Info := post.Info
 		MediaGroup := post.MediaGroup
 
-		log.Println(Info.Raw, Info.Url)
+		logger.LogAttrs(context.Background(), slog.LevelInfo, "SendPosts",
+			slog.String("微博正文", Info.Raw),
+			slog.String("微博链接", Info.Url))
 
 		SendCount += len(MediaGroup)
 
@@ -260,16 +272,21 @@ func SendPosts() {
 						func(ch PostQueue) {
 							// 有概率遇到 Wrong file identifier/http url specified 错误，但是仍然成功发送的情况
 							if err := sendMediaGroup(ch.MediaGroup, false); err != nil {
-								log.Println("重发失败: ", ch.Info.Raw, ch.Info.Url)
+								logger.LogAttrs(context.Background(), slog.LevelWarn, "Retry SendPosts Failed",
+									slog.String("微博正文", ch.Info.Raw),
+									slog.String("微博链接", ch.Info.Url),
+								)
 							}
-						}(ch.Info.SeedChBuilder(true))
+						}(ch.Info.SendChBuilder(true))
 					}
 				}
-			}(post.Info.SeedChBuilder(true))
+			}(post.Info.SendChBuilder(true))
 		}
 
 		if ok := InsertDB(Info.Raw, Info.Url); !ok {
-			log.Println("插入失败: ", Info.Url)
+			logger.LogAttrs(context.Background(), slog.LevelWarn, "写入数据库失败",
+				slog.String("URL", Info.Url),
+			)
 		}
 
 		if SendCount >= 30 {
@@ -277,10 +294,6 @@ func SendPosts() {
 			SendCount = 0
 		}
 	}
-}
-
-func removeHTMLTags(src string) string {
-	return strings.TrimSpace(regexp.MustCompile("<[^>]*>").ReplaceAllString(src, ""))
 }
 
 func parseImages(value gjson.Result) MediaInfo {
@@ -300,81 +313,4 @@ func parseImages(value gjson.Result) MediaInfo {
 	}
 
 	return MediaInfo{imageUrl: url, isPhoto: true}
-}
-
-func SavePics(schema string) string {
-	downloadPath := "download/"
-	_, err := os.Stat(downloadPath)
-	if os.IsNotExist(err) {
-		if err := os.Mkdir(downloadPath, os.ModePerm); err != nil {
-			log.Fatal("创建 download 文件夹失败, 检查当前目录下的文件夹权限", err)
-		}
-	}
-
-	decodedUrl, _ := url.QueryUnescape(schema)
-	filename := filepath.Join(downloadPath, path.Base(decodedUrl))
-
-	// Check if the file already exists
-	if _, err := os.Stat(filename); err == nil {
-		// File already exists, return the filename without downloading again
-		return filename
-	}
-
-	// File does not exist, proceed with the download
-
-	if err := getter.GetFile(filename, decodedUrl); err != nil {
-		log.Println("下载文件失败: ", err)
-		return ""
-	}
-
-	// Check image size and compress if necessary
-	if getImageSize(filename) > 10*1024*1024 {
-		compressAndReplaceImage(filename, 70)
-	}
-
-	return filename
-}
-
-func compressAndReplaceImage(imagePath string, compressionQuality int) error {
-	inputFile, err := os.Open(imagePath)
-	if err != nil {
-		return fmt.Errorf("无法打开输入图片文件: %v", err)
-	}
-	defer inputFile.Close()
-
-	img, _, err := image.Decode(inputFile)
-	if err != nil {
-		return fmt.Errorf("无法解码图片文件: %v", err)
-	}
-
-	tempOutputPath := imagePath + ".temp"
-	outputFile, err := os.Create(tempOutputPath)
-	if err != nil {
-		return fmt.Errorf("无法创建临时输出图片文件: %v", err)
-	}
-	defer outputFile.Close()
-
-	err = jpeg.Encode(outputFile, img, &jpeg.Options{Quality: compressionQuality})
-	if err != nil {
-		return fmt.Errorf("无法压缩图片: %v", err)
-	}
-
-	outputFile.Close()
-	err = os.Rename(tempOutputPath, imagePath)
-	if err != nil {
-		return fmt.Errorf("无法替代原始图片文件: %v", err)
-	}
-
-	return nil
-}
-
-func getImageSize(filePath string) int64 {
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		return 0
-	}
-	if !fileInfo.Mode().IsRegular() {
-		return 0
-	}
-	return fileInfo.Size()
 }
