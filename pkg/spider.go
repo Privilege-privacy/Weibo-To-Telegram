@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -11,15 +12,19 @@ import (
 	"github.com/go-resty/resty/v2"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/tidwall/gjson"
+	"go.uber.org/ratelimit"
 )
+
+const maxlength = 50 * 1024 * 1024
 
 var (
 	SendLivePics bool
 	SavePicLocal bool
 	MergeMessage bool
 
-	client = resty.New().SetBaseURL("https://m.weibo.cn")
-	PostCh = make(chan PostQueue)
+	client = resty.New().SetBaseURL("https://m.weibo.cn").SetTLSClientConfig(&tls.Config{
+		InsecureSkipVerify: true,
+	})
 	logger = slog.New(slog.Default().Handler())
 )
 
@@ -47,13 +52,13 @@ type (
 	}
 )
 
-func Run(uid int) {
+func Run(uid int, ch chan<- PostQueue) {
 	resp, err := client.R().Get("/api/container/getIndex?containerid=107603" + strconv.Itoa(uid))
 	body := resp.String()
 	if err != nil || gjson.Get(body, "ok").Int() != 1 {
 		return
 	}
-	ParsePost(body)
+	ParsePost(body, ch)
 }
 
 func NewPost(Url, Raw, BlogID string) *Post {
@@ -85,6 +90,7 @@ func (p *Post) MessageBuilder(Author, Raw, Url string) {
 	if mergeMessage {
 		Template = fmt.Sprintf("「 #%s 」\n\n *%s*\n", Author, Raw)
 		Template += fmt.Sprintf("\n[🔗点击查看原微博](%s)", Url)
+		Template = strings.ReplaceAll(Template, "_", "")
 	}
 
 	p.Raw = Raw
@@ -190,14 +196,13 @@ func (p *Post) SendMessage() {
 		switch {
 		case file.isVideo:
 			Bot.Send(tgbotapi.NewVideo(ChatId, tgbotapi.FileURL(SavePics(file.imageUrl))))
-			time.Sleep(time.Second)
 		case file.isPhoto:
 			Bot.Send(tgbotapi.NewPhoto(ChatId, tgbotapi.FileURL(SavePics(file.imageUrl))))
 		}
 	}
 }
 
-func ParsePost(jsonData string) {
+func ParsePost(jsonData string, ch chan<- PostQueue) {
 	gjson.Get(jsonData, "data.cards").ForEach(func(_, value gjson.Result) bool {
 		Url := value.Get("scheme").String()
 		if ExistsInDB(Url) {
@@ -225,8 +230,7 @@ func ParsePost(jsonData string) {
 
 		if VideoExist {
 			url := value.Get("mblog.page_info.urls|@values|0").String()
-			resp, _ := client.R().Get(url)
-			if resp.Size() < 50*1024*1024 {
+			if GetVideoLength(url) < maxlength {
 				posts.MediaInfo = append(posts.MediaInfo, MediaInfo{imageUrl: url, isVideo: true})
 			}
 		}
@@ -239,18 +243,15 @@ func ParsePost(jsonData string) {
 			return true
 		}
 
-		PostCh <- posts.SendChBuilder(false)
+		ch <- posts.SendChBuilder(false)
 
 		return true
 	})
 }
 
-func SendPosts() {
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-
-	SendCount := 0
-	for post := range PostCh {
+func SendPosts(ch <-chan PostQueue) {
+	rl := ratelimit.New(20, ratelimit.Per(time.Second*60))
+	for post := range ch {
 		Info := post.Info
 		MediaGroup := post.MediaGroup
 
@@ -258,12 +259,10 @@ func SendPosts() {
 			slog.String("微博正文", Info.Raw),
 			slog.String("微博链接", Info.Url))
 
-		SendCount += len(MediaGroup)
-
 		// 检查第一次是否成功发送媒体组
 		if err := sendMediaGroup(MediaGroup, true); err != nil {
 			func(ch PostQueue) {
-				// 如果没有成功发送，Double Check URL是否存在于数据库中
+				// 如果没有成功发送，再次检测 URL 是否存在于数据库中
 				if !ExistsInDB(ch.Info.Url) {
 					// 如果不存在，则将图片保存到本地后，再次尝试发送
 					if err := sendMediaGroup(ch.MediaGroup, true); err != nil {
@@ -283,16 +282,13 @@ func SendPosts() {
 			}(post.Info.SendChBuilder(true))
 		}
 
-		if ok := InsertDB(Info.Raw, Info.Url); !ok {
+		if !InsertDB(Info.Raw, Info.Url) {
 			logger.LogAttrs(context.Background(), slog.LevelWarn, "写入数据库失败",
 				slog.String("URL", Info.Url),
 			)
 		}
 
-		if SendCount >= 30 {
-			<-ticker.C
-			SendCount = 0
-		}
+		rl.Take()
 	}
 }
 

@@ -6,16 +6,13 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"sync"
 
 	_ "modernc.org/sqlite"
 )
 
-var (
-	db     *sql.DB
-	dbfile string = "weibo.db"
-	mutex  sync.Mutex
-)
+const dbfile string = "weibo.db"
+
+var db *sql.DB
 
 func init() {
 	_, err := os.Stat(dbfile)
@@ -25,7 +22,8 @@ func init() {
 		}
 	}
 
-	db, err = sql.Open("sqlite", dbfile)
+	db, err = sql.Open("sqlite", dbfile+"?cache=shared&mode=rwc&_journal_mode=WAL")
+	db.SetMaxOpenConns(1)
 	if err != nil {
 		log.Fatal("连接数据库失败：", err)
 	}
@@ -47,24 +45,22 @@ func createDatabase() error {
 }
 
 func ExistsInDB(url string) bool {
-	mutex.Lock()
-	defer mutex.Unlock()
+	row := db.QueryRow("SELECT COUNT(id) AS counts FROM weibo WHERE link = ?", url)
+
 	var count int
-	if err := db.QueryRow("SELECT COUNT(id) AS counts FROM weibo WHERE link = ?", url).Scan(&count); err != nil {
+	if err := row.Scan(&count); err != nil {
 		logger.LogAttrs(context.Background(), slog.LevelWarn, "ExistsInDB Failed", slog.String("URL", url))
 		return false
 	}
+
 	return count > 0
 }
 
-func InsertDB(title, url string) bool {
-	mutex.Lock()
-	defer mutex.Unlock()
-	results, err := db.Exec("INSERT INTO weibo(summary, link) VALUES(?, ?)", title, url)
+func InsertDB(summary, link string) bool {
+	_, err := db.Exec("INSERT INTO weibo(summary, link) VALUES(?, ?)", summary, link)
 	if err != nil {
-		logger.LogAttrs(context.Background(), slog.LevelWarn, "InsertDB Failed", slog.String("URL", url))
+		logger.LogAttrs(context.Background(), slog.LevelWarn, "InsertDB Failed", slog.String("URL", link))
 		return false
 	}
-	result, _ := results.RowsAffected()
-	return result > 0
+	return true
 }

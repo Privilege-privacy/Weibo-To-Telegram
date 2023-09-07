@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -13,13 +14,13 @@ import (
 )
 
 type Config struct {
-	TgBotApiToken string
-	TgChatid      int64
-	WeiboUid      []int
 	MergeMessage  bool
-	Interval      int
 	SavePicLocal  bool
 	SendLivePics  bool
+	Interval      int
+	TgChatid      int64
+	WeiboUid      []int
+	TgBotApiToken string
 }
 
 func CreateConfig() error {
@@ -51,13 +52,22 @@ func LoadConfig() *Config {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	defer f.Close()
 	err = toml.NewDecoder(f).Decode(config)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return config
+}
+
+func GetVideoLength(input string) int {
+	resp, err := http.Get(input)
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+	return int(resp.ContentLength)
 }
 
 func parseHTML(input string) string {
@@ -105,13 +115,9 @@ func SavePics(schema string) string {
 	decodedUrl, _ := url.QueryUnescape(schema)
 	filename := filepath.Join(downloadPath, path.Base(decodedUrl))
 
-	// Check if the file already exists
 	if _, err := os.Stat(filename); err == nil {
-		// File already exists, return the filename without downloading again
 		return filename
 	}
-
-	// File does not exist, proceed with the download
 
 	_, err = client.R().SetOutput(filename).Get(decodedUrl)
 	if err != nil {
